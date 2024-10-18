@@ -1,0 +1,7 @@
+Flask
+flask-cors
+nltk
+numpy
+requests
+pdfminer.six
+scikit-learn

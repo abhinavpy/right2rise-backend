@@ -24,23 +24,29 @@ def load_embeddings(filename='embeddings.pkl'):
 # Load embeddings when the app starts
 print("Loading embeddings...")
 all_chunks = load_embeddings()
-print(f"Loaded {len(all_chunks)} chunks.")
+print("Loaded {} chunks.".format(len(all_chunks)))
 
 def get_query_embedding(text):
-    """Get embedding vector for the query text using Gemini API."""
-    url = f'https://generativelanguage.googleapis.com/v1beta2/models/gemini-1.5-flash-latest:embedText?key={API_KEY}'
+    """Get embedding vector for the query text using the updated PaLM API."""
+    model_name = 'models/text-embedding-004'
+    url = f'https://generativelanguage.googleapis.com/v1beta/{model_name}:embedContent?key={API_KEY}'
     headers = {
         'Content-Type': 'application/json',
     }
     data = {
-        'text': text
+        'content': {
+            'parts': [
+                {'text': text}
+            ]
+        }
+        # 'outputDimensionality': 768  # Optional: specify if you want a reduced dimension
     }
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
         embedding = response.json()['embedding']['value']
         return embedding
     else:
-        print(f"Error getting query embedding: {response.status_code}, {response.text}")
+        print("Error getting query embedding: {}, {}".format(response.status_code, response.text))
         return None
 
 def find_similar_chunks(query_embedding, all_chunks, top_k=5):
@@ -53,25 +59,36 @@ def find_similar_chunks(query_embedding, all_chunks, top_k=5):
     return similar_chunks
 
 def generate_answer(context, query):
-    """Generate an answer using the context and query with Gemini API."""
-    url = f'https://generativelanguage.googleapis.com/v1beta2/models/gemini-1.5-flash-latest:generateText?key={API_KEY}'
+    """Generate an answer using the context and query with the updated PaLM API."""
+    model_name = 'models/gemini-1.5-flash-latest'
+    url = f'https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={API_KEY}'
     headers = {
         'Content-Type': 'application/json',
     }
-    prompt = f"Context:\n{context}\n\nQuestion:\n{query}\n\nAnswer:"
     data = {
-        'prompt': {
-            'text': prompt
-        },
+        'contents': [
+            {
+                'parts': [
+                    {'text': f"Context:\n{context}\n\nQuestion:\n{query}\n\nAnswer:"}
+                ]
+            }
+        ],
         'temperature': 0.7,
         'maxOutputTokens': 256
     }
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
-        answer = response.json()['candidates'][0]['output']
-        return answer.strip()
+        result = response.json()
+        # Parse the generated content
+        if 'candidates' in result and len(result['candidates']) > 0:
+            candidate = result['candidates'][0]
+            if 'contents' in candidate and len(candidate['contents']) > 0:
+                content_parts = candidate['contents'][0]['parts']
+                answer_text = ''.join([part['text'] for part in content_parts])
+                return answer_text.strip()
+        return "I'm sorry, but I couldn't process your request at this time."
     else:
-        print(f"Error generating answer: {response.status_code}, {response.text}")
+        print("Error generating answer: {}, {}".format(response.status_code, response.text))
         return "I'm sorry, but I couldn't process your request at this time."
 
 @app.route('/api/ask', methods=['POST'])
@@ -82,7 +99,7 @@ def answer_query():
     if not query:
         return jsonify({'answer': 'No query provided.'}), 400
 
-    print(f"Received query: {query}")
+    print("Received query: {}".format(query))
 
     # Get embedding for the query
     query_embedding = get_query_embedding(query)
@@ -104,4 +121,3 @@ if __name__ == '__main__':
     else:
         # Run the app
         app.run(host='0.0.0.0', port=5000)
-

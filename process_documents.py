@@ -21,7 +21,7 @@ def extract_text_from_pdf(pdf_path):
         text = extract_text(pdf_path)
         return text
     except Exception as e:
-        print(f"Error reading {pdf_path}: {e}")
+        print("Error reading {}: {}".format(pdf_path, e))
         return ""
 
 def read_text_file(file_path):
@@ -30,7 +30,7 @@ def read_text_file(file_path):
         with open(file_path, 'r', encoding='utf-8') as file:
             return file.read()
     except Exception as e:
-        print(f"Error reading {file_path}: {e}")
+        print("Error reading {}: {}".format(file_path, e))
         return ""
 
 def get_all_documents(directory):
@@ -41,13 +41,13 @@ def get_all_documents(directory):
         if filename.lower().endswith('.txt'):
             text = read_text_file(filepath)
             documents.append({'filename': filename, 'text': text})
-            print(f"Loaded text file: {filename}")
+            print("Loaded text file: {}".format(filename))
         elif filename.lower().endswith('.pdf'):
             text = extract_text_from_pdf(filepath)
             documents.append({'filename': filename, 'text': text})
-            print(f"Loaded PDF file: {filename}")
+            print("Loaded PDF file: {}".format(filename))
         else:
-            print(f"Skipped file (unsupported format): {filename}")
+            print("Skipped file (unsupported format): {}".format(filename))
     return documents
 
 def split_text(text, max_length=500):
@@ -70,26 +70,26 @@ def split_text(text, max_length=500):
     return chunks
 
 def get_embedding(text):
-    """Get embedding vector for the given text using PaLM API."""
-    url = f'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={API_KEY}'
+    """Get embedding vector for the given text using the updated PaLM API."""
+    model_name = 'models/text-embedding-004'
+    url = f'https://generativelanguage.googleapis.com/v1beta/{model_name}:embedContent?key={API_KEY}'
     headers = {
         'Content-Type': 'application/json',
     }
     data = {
-        "content":{
-            "parts":[
-                {
-                    "text": text
-                }
+        'content': {
+            'parts': [
+                {'text': text}
             ]
         }
+        # 'outputDimensionality': 768  # Optional: specify if you want a reduced dimension
     }
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
         embedding = response.json()['embedding']['value']
         return embedding
     else:
-        print(f"Error getting embedding: {response.status_code}, {response.text}")
+        print("Error getting embedding: {}, {}".format(response.status_code, response.text))
         return None
 
 def process_documents(directory):
@@ -98,7 +98,7 @@ def process_documents(directory):
     all_chunks = []
     for doc in documents:
         text_chunks = split_text(doc['text'])
-        print(f"Processing {doc['filename']} with {len(text_chunks)} chunks")
+        print("Processing {} with {} chunks".format(doc['filename'], len(text_chunks)))
         for idx, chunk in enumerate(text_chunks):
             embedding = get_embedding(chunk)
             if embedding:
@@ -108,16 +108,16 @@ def process_documents(directory):
                     'text': chunk,
                     'embedding': embedding
                 })
-                print(f"Generated embedding for chunk {idx+1}/{len(text_chunks)} of {doc['filename']}")
+                print("Generated embedding for chunk {}/{} of {}".format(idx+1, len(text_chunks), doc['filename']))
             else:
-                print(f"Failed to generate embedding for chunk {idx+1} of {doc['filename']}")
+                print("Failed to generate embedding for chunk {} of {}".format(idx+1, doc['filename']))
     return all_chunks
 
 def save_embeddings(all_chunks, filename='embeddings.pkl'):
     """Save embeddings to a file using pickle."""
     with open(filename, 'wb') as f:
         pickle.dump(all_chunks, f)
-    print(f"Embeddings saved to {filename}")
+    print("Embeddings saved to {}".format(filename))
 
 def load_embeddings(filename='embeddings.pkl'):
     """Load embeddings from a pickle file."""

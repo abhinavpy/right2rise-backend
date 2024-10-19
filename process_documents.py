@@ -9,6 +9,7 @@ import numpy as np
 
 # Initialize NLTK (run this only once)
 nltk.download('punkt')
+nltk.download('punkt_tab')
 
 # Replace 'YOUR_PALM_API_KEY' with your actual PaLM API key
 # Alternatively, set it as an environment variable 'PALM_API_KEY'
@@ -70,7 +71,7 @@ def split_text(text, max_length=500):
 
 def get_embedding(text):
     """Get embedding vector for the given text using PaLM API."""
-    url = f'https://generativelanguage.googleapis.com/v1beta2/models/embedding-gecko-001:embedText?key={API_KEY}'
+    url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:embedText?key={API_KEY}'
     headers = {
         'Content-Type': 'application/json',
     }

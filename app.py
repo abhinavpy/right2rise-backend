@@ -27,8 +27,8 @@ all_chunks = load_embeddings()
 print(f"Loaded {len(all_chunks)} chunks.")
 
 def get_query_embedding(text):
-    """Get embedding vector for the query text using PaLM API."""
-    url = f'https://generativelanguage.googleapis.com/v1beta2/models/embedding-gecko-001:embedText?key={API_KEY}'
+    """Get embedding vector for the query text using Gemini API."""
+    url = f'https://generativelanguage.googleapis.com/v1beta2/models/gemini-1.5-flash-latest:embedText?key={API_KEY}'
     headers = {
         'Content-Type': 'application/json',
     }
@@ -53,8 +53,8 @@ def find_similar_chunks(query_embedding, all_chunks, top_k=5):
     return similar_chunks
 
 def generate_answer(context, query):
-    """Generate an answer using the context and query with PaLM API."""
-    url = f'https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generateText?key={API_KEY}'
+    """Generate an answer using the context and query with Gemini API."""
+    url = f'https://generativelanguage.googleapis.com/v1beta2/models/gemini-1.5-flash-latest:generateText?key={API_KEY}'
     headers = {
         'Content-Type': 'application/json',
     }
@@ -98,10 +98,10 @@ def answer_query():
     return jsonify({'answer': answer})
 
 if __name__ == '__main__':
-    # # Ensure you have set your API_KEY
-    # if API_KEY == 'YOUR_PALM_API_KEY':
-    #     print("Please set your PaLM API key in the script or as an environment variable 'PALM_API_KEY'.")
-    # else:
-    #     # Run the app
-    app.run(host='0.0.0.0', port=5000)
+    # Ensure you have set your API_KEY
+    if API_KEY == 'YOUR_PALM_API_KEY':
+        print("Please set your PaLM API key in the script or as an environment variable 'PALM_API_KEY'.")
+    else:
+        # Run the app
+        app.run(host='0.0.0.0', port=5000)
 

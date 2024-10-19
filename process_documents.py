@@ -71,12 +71,18 @@ def split_text(text, max_length=500):
 
 def get_embedding(text):
     """Get embedding vector for the given text using PaLM API."""
-    url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:embedText?key={API_KEY}'
+    url = f'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={API_KEY}'
     headers = {
         'Content-Type': 'application/json',
     }
     data = {
-        'text': text
+        "content":{
+            "parts":[
+                {
+                    "text": text
+                }
+            ]
+        }
     }
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
@@ -126,4 +132,3 @@ if __name__ == '__main__':
         all_chunks = process_documents('./documents')
         save_embeddings(all_chunks)
         print("Document processing complete. Embeddings saved to embeddings.pkl.")
-

@@ -11,9 +11,9 @@ import numpy as np
 nltk.download('punkt')
 nltk.download('punkt_tab')
 
-# Replace 'YOUR_PALM_API_KEY' with your actual PaLM API key
-# Alternatively, set it as an environment variable 'PALM_API_KEY'
-API_KEY = os.environ.get('PALM_API_KEY', 'YOUR_PALM_API_KEY')
+# Replace 'YOUR_GEMINI_API_KEY' with your actual Gemini API key
+# Alternatively, set it as an environment variable 'API_KEY'
+API_KEY = os.environ.get('API_KEY', 'YOUR_GEMINI_API_KEY')
 
 def extract_text_from_pdf(pdf_path):
     """Extract text from a PDF file."""
@@ -70,7 +70,7 @@ def split_text(text, max_length=500):
     return chunks
 
 def get_embedding(text):
-    """Get embedding vector for the given text using the updated PaLM API."""
+    """Get embedding vector for the given text using the updated Gemini API."""
     model_name = 'models/text-embedding-004'
     url = f'https://generativelanguage.googleapis.com/v1beta/{model_name}:embedContent?key={API_KEY}'
     headers = {
@@ -84,7 +84,12 @@ def get_embedding(text):
         }
         # 'outputDimensionality': 768  # Optional: specify if you want a reduced dimension
     }
-    response = requests.post(url, headers=headers, json=data)
+    try:
+        response = requests.post(url, headers=headers, json=data)
+    except Exception as e:
+        print(f"Error making embedContent API request: {e}")
+        return None
+
     if response.status_code == 200:
         embedding = response.json()['embedding']['values']
         return embedding
@@ -126,8 +131,8 @@ def load_embeddings(filename='embeddings.pkl'):
 
 if __name__ == '__main__':
     # Ensure you have set your API_KEY
-    if API_KEY == 'YOUR_PALM_API_KEY':
-        print("Please set your PaLM API key in the script or as an environment variable 'PALM_API_KEY'.")
+    if API_KEY == 'YOUR_GEMINI_API_KEY':
+        print("Please set your Gemini API key in the script or as an environment variable 'API_KEY'.")
     else:
         all_chunks = process_documents('./documents')
         save_embeddings(all_chunks)

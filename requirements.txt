@@ -1,7 +1,9 @@
 Flask
 flask-cors
+cryptography
 nltk
 numpy
 requests
 pdfminer.six
 scikit-learn
+pyOpenSSH

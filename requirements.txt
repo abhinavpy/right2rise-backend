@@ -6,4 +6,4 @@ numpy
 requests
 pdfminer.six
 scikit-learn
-pyOpenSSH
+pyOpenSSL

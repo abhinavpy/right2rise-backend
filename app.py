@@ -43,7 +43,7 @@ def get_query_embedding(text):
     }
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
-        embedding = response.json()['embedding']['value']
+        embedding = response.json()['embedding']['values']
         return embedding
     else:
         print("Error getting query embedding: {}, {}".format(response.status_code, response.text))
@@ -51,8 +51,8 @@ def get_query_embedding(text):
 
 def find_similar_chunks(query_embedding, all_chunks, top_k=5):
     """Find top_k most similar chunks to the query embedding."""
-    embeddings = np.array([chunk['embedding'] for chunk in all_chunks])
-    query_embedding = np.array(query_embedding)
+    embeddings = np.array([chunk['embedding'] for chunk in all_chunks], dtype=np.float32)
+    query_embedding = np.array(query_embedding, dtype=np.float32)
     similarities = np.dot(embeddings, query_embedding) / (np.linalg.norm(embeddings, axis=1) * np.linalg.norm(query_embedding) + 1e-10)
     top_k_indices = similarities.argsort()[-top_k:][::-1]
     similar_chunks = [all_chunks[i] for i in top_k_indices]
@@ -65,11 +65,12 @@ def generate_answer(context, query):
     headers = {
         'Content-Type': 'application/json',
     }
+    prompt_text = f"Context:\n{context}\n\nQuestion:\n{query}\n\nAnswer:"
     data = {
         'contents': [
             {
                 'parts': [
-                    {'text': f"Context:\n{context}\n\nQuestion:\n{query}\n\nAnswer:"}
+                    {'text': prompt_text}
                 ]
             }
         ],
@@ -79,14 +80,18 @@ def generate_answer(context, query):
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
         result = response.json()
-        # Parse the generated content
         if 'candidates' in result and len(result['candidates']) > 0:
             candidate = result['candidates'][0]
-            if 'contents' in candidate and len(candidate['contents']) > 0:
-                content_parts = candidate['contents'][0]['parts']
+            if 'content' in candidate and 'parts' in candidate['content']:
+                content_parts = candidate['content']['parts']
                 answer_text = ''.join([part['text'] for part in content_parts])
                 return answer_text.strip()
-        return "I'm sorry, but I couldn't process your request at this time."
+            else:
+                print("No content in the candidate response.")
+                return "I'm sorry, but I couldn't process your request at this time."
+        else:
+            print("No candidates found in the response.")
+            return "I'm sorry, but I couldn't process your request at this time."
     else:
         print("Error generating answer: {}, {}".format(response.status_code, response.text))
         return "I'm sorry, but I couldn't process your request at this time."

@@ -86,7 +86,7 @@ def get_embedding(text):
     }
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
-        embedding = response.json()['embedding']['value']
+        embedding = response.json()['embedding']['values']
         return embedding
     else:
         print("Error getting embedding: {}, {}".format(response.status_code, response.text))

@@ -1,0 +1,6 @@
+# .gitignore
+.env
+
+# Embeddings Pickle
+embeddings.pkl
+

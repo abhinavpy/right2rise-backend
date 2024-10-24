@@ -6,14 +6,21 @@ import os
 import numpy as np
 import requests
 import pickle
+from google.oauth2 import id_token
+from google.auth.transport import requests as grequests
+import jwt
+import datetime
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS to allow requests from your frontend
+CORS(app, origins=["http://localhost:3000"])  # Enable CORS to allow requests from your frontend
 
-# Replace 'YOUR_GEMINI_API_KEY' with your actual Gemini API key
-# Alternatively, set it as an environment variable
+# Configuration
 API_KEY = os.environ.get('API_KEY', 'YOUR_GEMINI_API_KEY')
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'YOUR_GOOGLE_CLIENT_ID')  # Add your Client ID
+JWT_SECRET = os.environ.get('JWT_SECRET', 'your_jwt_secret_key')  # Replace with a secure key
+JWT_ALGORITHM = 'HS256'
+JWT_EXP_DELTA_SECONDS = 3600  # Token valid for 1 hour
 
 # Load embeddings from the pickle file
 def load_embeddings(filename='embeddings.pkl'):
@@ -51,7 +58,7 @@ def get_query_embedding(text):
         embedding = response.json()['embedding']['values']
         return embedding
     else:
-        print("Error getting query embedding: {}, {}".format(response.status_code, response.text))
+        print("Error getting embedding: {}, {}".format(response.status_code, response.text))
         return None
 
 def find_similar_chunks(query_embedding, all_chunks, top_k=5):
@@ -78,7 +85,7 @@ def generate_answer(context, query):
     # Sanitize the context by removing single and double quotes
     sanitized_context = sanitize_text(context)
     prompt_text = f"Context:\n{sanitized_context}\n\nQuestion:\n{query}\n\nAnswer:"
-    
+
     # Construct the JSON payload with only required fields
     data = {
         'contents': [
@@ -95,13 +102,13 @@ def generate_answer(context, query):
 
     # Debug: Print the data being sent
     print("Sending generateContent request with data:", data)
-    
+
     try:
         response = requests.post(url, headers=headers, json=data)
     except Exception as e:
         print(f"Error making generateContent API request: {e}")
         return "I'm sorry, but I couldn't process your request at this time."
-    
+
     if response.status_code == 200:
         result = response.json()
         if 'candidates' in result and len(result['candidates']) > 0:
@@ -120,15 +127,85 @@ def generate_answer(context, query):
         print("Error generating answer: {}, {}".format(response.status_code, response.text))
         return "I'm sorry, but I couldn't process your request at this time."
 
+def create_jwt_token(user_info):
+    """Create a JWT token."""
+    payload = {
+        'user_id': user_info['sub'],  # Google's unique user ID
+        'email': user_info.get('email'),
+        'name': user_info.get('name'),
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=JWT_EXP_DELTA_SECONDS)
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    if isinstance(token, bytes):
+        token = token.decode('utf-8')
+
+    return token
+
+def verify_jwt_token(token):
+    """Verify a JWT token."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        print("JWT token has expired.")
+        return None
+    except jwt.InvalidTokenError:
+        print("Invalid JWT token.")
+        return None
+
+@app.route('/api/auth/google', methods=['POST'])
+def auth_google():
+    """Authenticate user using Google ID token."""
+    data = request.get_json()
+    token = data.get('token', '')
+
+    if not token:
+        return jsonify({'success': False, 'message': 'No token provided.'}), 400
+
+    try:
+        # Specify the CLIENT_ID of the app that accesses the backend
+        idinfo = id_token.verify_oauth2_token(token, grequests.Request(), GOOGLE_CLIENT_ID)
+
+        # ID token is valid. Get the user's Google Account ID from the decoded token.
+        userid = idinfo['sub']
+        email = idinfo.get('email')
+        name = idinfo.get('name')
+
+        # Create JWT token for your application
+        jwt_token = create_jwt_token(idinfo)
+
+        return jsonify({'success': True, 'token': jwt_token}), 200
+
+    except ValueError as e:
+        # Invalid token
+        print(f"Invalid token: {e}")
+        return jsonify({'success': False, 'message': 'Invalid token. {e}'}), 400
+
+
 @app.route('/api/ask', methods=['POST'])
 def answer_query():
     """Handle incoming queries from the frontend."""
+    # Verify JWT token from Authorization header
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header:
+        return jsonify({'answer': 'Authorization header missing.'}), 401
+
+    try:
+        # Expecting header in format "Bearer <token>"
+        token = auth_header.split()[1]
+    except IndexError:
+        return jsonify({'answer': 'Invalid authorization header format.'}), 401
+
+    payload = verify_jwt_token(token)
+    if not payload:
+        return jsonify({'answer': 'Invalid or expired token.'}), 401
+
     data = request.get_json()
     query = data.get('query', '').strip()
     if not query:
         return jsonify({'answer': 'No query provided.'}), 400
 
-    print("Received query: {}".format(query))
+    print("Received query from user {}: {}".format(payload['email'], query))
 
     # Get embedding for the query
     query_embedding = get_query_embedding(query)
@@ -148,9 +225,10 @@ def answer_query():
     return jsonify({'answer': answer})
 
 if __name__ == '__main__':
-    # Ensure you have set your API_KEY
-    if API_KEY == 'YOUR_GEMINI_API_KEY':
-        print("Please set your Gemini API key in the script or as an environment variable 'API_KEY'.")
+    # Ensure you have set your API_KEY, GOOGLE_CLIENT_ID, and JWT_SECRET
+    if API_KEY == 'YOUR_GEMINI_API_KEY' or GOOGLE_CLIENT_ID == 'YOUR_GOOGLE_CLIENT_ID' or JWT_SECRET == 'your_jwt_secret_key':
+        print("Please set your Gemini API key, Google Client ID, and JWT secret key in environment variables.")
     else:
         # Run the app on all interfaces, port 5000
         app.run(host='0.0.0.0', port=5000)
+

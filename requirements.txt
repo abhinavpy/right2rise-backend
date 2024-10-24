@@ -3,7 +3,10 @@ flask-cors
 cryptography
 nltk
 numpy
+Flask-session
+google-auth
 requests
 pdfminer.six
 scikit-learn
 pyOpenSSL
+PyJWT

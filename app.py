@@ -10,6 +10,10 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as grequests
 import jwt
 import datetime
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -188,29 +192,35 @@ def answer_query():
     # Verify JWT token from Authorization header
     auth_header = request.headers.get('Authorization', '')
     if not auth_header:
-        return jsonify({'answer': 'Authorization header missing.'}), 401
+        logging.warning("Authorization header missing.")
+        return jsonify({'success': False, 'answer': 'Authorization header missing.'}), 401
 
     try:
         # Expecting header in format "Bearer <token>"
         token = auth_header.split()[1]
     except IndexError:
-        return jsonify({'answer': 'Invalid authorization header format.'}), 401
+        logging.warning("Invalid authorization header format.")
+        return jsonify({'success': False, 'answer': 'Invalid authorization header format.'}), 401
 
     payload = verify_jwt_token(token)
     if not payload:
-        return jsonify({'answer': 'Invalid or expired token.'}), 401
+        logging.warning("Invalid or expired token.")
+        return jsonify({'success': False, 'answer': 'Invalid or expired token.'}), 401
 
     data = request.get_json()
     query = data.get('query', '').strip()
     if not query:
-        return jsonify({'answer': 'No query provided.'}), 400
+        logging.warning("No query provided by user {}.".format(payload.get('email', 'Unknown')))
+        return jsonify({'success': False, 'answer': 'No query provided.'}), 400
 
     print("Received query from user {}: {}".format(payload['email'], query))
+    logging.info("Received query from user {}: {}".format(payload.get('email', 'Unknown'), query))
 
     # Get embedding for the query
     query_embedding = get_query_embedding(query)
     if query_embedding is None:
-        return jsonify({'answer': 'Error generating query embedding.'}), 500
+        logging.error("Error generating query embedding for user {}.".format(payload.get('email', 'Unknown')))
+        return jsonify({'success': False, 'answer': 'Error generating query embedding.'}), 500
 
     # Find similar chunks
     similar_chunks = find_similar_chunks(query_embedding, all_chunks)
@@ -218,11 +228,12 @@ def answer_query():
 
     # Check if context is empty
     if not context:
-        return jsonify({'answer': "I'm sorry, but I couldn't find relevant information to answer your question."}), 404
+        logging.info("No relevant information found for user {}'s query.".format(payload.get('email', 'Unknown')))
+        return jsonify({'success': False, 'answer': "I'm sorry, but I couldn't find relevant information to answer your question."}), 404
 
     # Generate answer
     answer = generate_answer(context, query)
-    return jsonify({'answer': answer})
+    return jsonify({'success': True, 'answer': answer})
 
 if __name__ == '__main__':
     # Ensure you have set your API_KEY, GOOGLE_CLIENT_ID, and JWT_SECRET
